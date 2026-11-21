@@ -2,6 +2,10 @@
 
 Blink is a local screenshot search app for macOS. Press **Control–Space** and type what you remember, like `reset VPN token`, `blue chart`, or `#quote`. Use the arrow keys to pick a screenshot, then press **Return** to open it or **⌘C** to copy the image.
 
+https://github.com/user-attachments/assets/57a4154e-1e24-4e29-8701-8bd94788e4fa
+
+release post: https://x.com/0interestrates/status/2123989830447022140
+
 ## What makes screenshots searchable?
 
 Blink watches one folder. Apple Vision reads the text in each image, and Inkling 2 Mini, running locally through Ollama, looks at the screenshot and generates a short title, a description, labels, and phrases you might search for later. This also works for images without text. Blink stores the results in SQLite and searches that index as you type.
@@ -34,7 +38,7 @@ You need an Apple silicon Mac with **32 GB or more unified memory** for the reco
    mkdir -p ~/Applications
    ditto build/Blink.app ~/Applications/Blink.app
    open ~/Applications/Blink.app
-   ```
+   ````
 
    The script builds and locally signs the app. To try it directly from the repository, use `open build/Blink.app` after building.
 
