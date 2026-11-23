@@ -13,6 +13,7 @@ Blink watches one folder. Apple Vision reads the text in each image, and Inkling
 - **Search by label.** Try `#instructions vpn` or combine labels with `#substack #quote`.
 - **Search by initials.** Blink uses Apple's Natural Language framework to recognize people and organizations. A screenshot mentioning Paul Graham can turn up for `pg`.
 - **Keep Finder organized.** Eligible new CleanShot and macOS captures can get names like `instructions_reset_vpn_token_2026-11-20_17-04-25.png`. This renames the actual file. Toggle **Auto-rename new screenshots** in the menu bar.
+- **Copy new screenshots to the clipboard.** macOS saves a capture either to a file or to the clipboard, not both. With **Copy new screenshots to clipboard** on in the menu bar, each new CleanShot or macOS capture saved to the watched folder is also placed on the clipboard, ready to paste.
 - **Save a clipboard image.** Choose **Index clipboard image** from the menu bar to save it to the watched folder.
 
 ## Install
