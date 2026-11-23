@@ -156,6 +156,7 @@ final class App:NSObject,NSApplicationDelegate,NSTableViewDataSource,NSTableView
     let panel=Panel(contentRect:NSRect(x:0,y:0,width:820,height:560),styleMask:[.titled,.closable,.fullSizeContentView,.utilityWindow],backing:.buffered,defer:false)
     let search=NSSearchField(), table=NSTableView(), status=NSTextField(labelWithString:""), scroll=NSScrollView()
     var item:NSStatusItem!, hot:EventHotKeyRef?, watch:DispatchSourceFileSystemObject?
+    var copied=Set<String>(), copySince=Date()
     var rows=[[String]](), busy=false, captionBusy=false, lastScan=Date.distantPast, lastCaption=Date.distantPast, note="", hotWarning=""
     var pendingSearch: DispatchWorkItem?
     private let previews = OperationQueue()
@@ -173,6 +174,10 @@ final class App:NSObject,NSApplicationDelegate,NSTableViewDataSource,NSTableView
         rename.target=self
         rename.state=prefs.object(forKey:"autoRename") as? Bool == false ? .off : .on
         menu.insertItem(rename,at:2)
+        let copy = NSMenuItem(title:"Copy new screenshots to clipboard",action:#selector(toggleCopy(_:)),keyEquivalent:"")
+        copy.target=self
+        copy.state=prefs.bool(forKey:"copyToClipboard") ? .on : .off
+        menu.insertItem(copy,at:3)
         item.menu=menu
         panel.acceptsMouseMovedEvents = true
         panel.title="Blink";panel.titlebarAppearsTransparent=true;panel.isFloatingPanel=true;panel.hidesOnDeactivate=true
@@ -273,6 +278,33 @@ final class App:NSObject,NSApplicationDelegate,NSTableViewDataSource,NSTableView
         if enabled { prefs.set(Date(),forKey:"renameSince."+folder) }
         sender.state = enabled ? .on : .off
     }
+    @objc func toggleCopy(_ sender:NSMenuItem) {
+        let enabled = sender.state != .on
+        prefs.set(enabled,forKey:"copyToClipboard")
+        if enabled { copySince=Date() }
+        sender.state = enabled ? .on : .off
+    }
+    // Put each newly saved screenshot on the clipboard, so a capture is both saved and ready to paste.
+    func copyNewCaptures(attempt:Int=0){
+        guard prefs.bool(forKey:"copyToClipboard"), !folder.isEmpty,
+              let urls=try? FileManager.default.contentsOfDirectory(at:URL(fileURLWithPath:folder),includingPropertiesForKeys:[.creationDateKey],options:.skipsHiddenFiles) else {return}
+        let cutoff=max(copySince,Date().addingTimeInterval(-20))
+        let fresh=urls.compactMap { url -> (URL,Date)? in
+            guard formats.contains(url.pathExtension.lowercased()), !copied.contains(url.path),
+                  url.lastPathComponent.range(of:#"^(CleanShot|Screen ?Shot|Screen Capture)[ _-]+[0-9]{4}[-.][0-9]{2}"#,options:[.regularExpression,.caseInsensitive]) != nil,
+                  let created=(try? url.resourceValues(forKeys:[.creationDateKey]))?.creationDate, created >= cutoff else {return nil}
+            return (url,created)
+        }.sorted { $0.1 < $1.1 }
+        guard let newest=fresh.last?.0 else {return}
+        guard let image=NSImage(contentsOf:newest), image.isValid else {
+            // The file can appear before it is fully written; try again shortly.
+            if attempt < 10 { DispatchQueue.main.asyncAfter(deadline:.now()+0.3){[weak self] in self?.copyNewCaptures(attempt:attempt+1)} }
+            return
+        }
+        for (url,_) in fresh {copied.insert(url.path)}
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([image])
+    }
     @objc func quit(){NSApp.terminate(nil)}
     @objc func show(){NSApp.activate(ignoringOtherApps:true);panel.makeKeyAndOrderFront(nil);panel.makeFirstResponder(search);refresh()}
     @objc func choose(){
@@ -285,12 +317,13 @@ final class App:NSObject,NSApplicationDelegate,NSTableViewDataSource,NSTableView
         if prefs.object(forKey:"renameSince."+folder) == nil {prefs.set(Date(),forKey:"renameSince."+folder)}
         let fd=open(folder,O_EVTONLY)
         if fd >= 0 {let source=DispatchSource.makeFileSystemObjectSource(fileDescriptor:fd,eventMask:[.write,.rename,.delete],queue:.main)
-            source.setEventHandler{[weak self] in self?.lastScan = .distantPast};source.setCancelHandler{close(fd)};source.resume();watch=source}
+            source.setEventHandler{[weak self] in self?.lastScan = .distantPast;self?.copyNewCaptures()};source.setCancelHandler{close(fd)};source.resume();watch=source}
         tick()
     }
     func tick(){
         let path=folder
         guard !path.isEmpty else {return}
+        copyNewCaptures()
         if !busy {
             busy=true
             let scan=Date().timeIntervalSince(lastScan)>15
